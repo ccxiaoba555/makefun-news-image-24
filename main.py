@@ -15,6 +15,7 @@ runs produce byte-identical output:
     mkdir -p out && MAKEFUN_OUTPUT_DIR=out python3 main.py
 """
 
+import hashlib
 import os
 import shutil
 import sys
@@ -22,8 +23,19 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+def _sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _copy_front_page(target_dir: str) -> str:
     origin = os.path.join(SCRIPT_DIR, "entry.png")
+    if not os.path.isfile(origin):
+        print(f"error: {origin} is missing", file=sys.stderr)
+        raise SystemExit(2)
     target = os.path.join(target_dir, "entry.png")
     os.makedirs(target_dir, exist_ok=True)
     shutil.copyfile(origin, target)
@@ -38,6 +50,9 @@ def _check_sizes(origin: str, target: str) -> bool:
             f"error: wrote {actual} bytes, expected {expected}",
             file=sys.stderr,
         )
+        return False
+    if _sha256(origin) != _sha256(target):
+        print("error: copied file failed sha256 check", file=sys.stderr)
         return False
     print(f"{target} {actual} bytes")
     return True
